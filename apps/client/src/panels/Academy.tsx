@@ -33,7 +33,7 @@ export default function Academy({ panel }: { panel: Extract<PanelId, { kind: 'ac
   );
 }
 
-function ChapterMap({ streamId, onLesson, onBoss }: { streamId: 'network' | 'cloud' | 'forex'; onLesson: (id: string) => void; onBoss: (id: string) => void }) {
+function ChapterMap({ streamId, onLesson, onBoss }: { streamId: 'network' | 'cloud' | 'forex' | 'dev'; onLesson: (id: string) => void; onBoss: (id: string) => void }) {
   const s = getStream(streamId);
   const { progress, profile } = useGame();
   const done = useGame((g) => g.completedLessons());
@@ -140,6 +140,8 @@ export function labPanel(l: LabRef): PanelId | null {
     case 'hpc':
     case 'k8s3d':
       return { kind: 'shelllab', labId: l.id, profile: l.kind === 'k8s3d' ? 'cloud' : (l.kind as 'linux') };
+    case 'dev':
+      return { kind: 'shelllab', labId: l.id, profile: 'dev' };
     case 'rack':
       return { kind: 'rack' };
     case 'pcbuild':
@@ -155,7 +157,7 @@ export function labPanel(l: LabRef): PanelId | null {
 }
 
 function findLesson(id: string): { lesson: Lesson; chapter: Chapter; next?: Lesson } | undefined {
-  for (const sid of ['network', 'cloud', 'forex'] as const) {
+  for (const sid of ['network', 'cloud', 'forex', 'dev'] as const) {
     const s = getStream(sid);
     const all = s.chapters.flatMap((c) => c.lessons.map((l) => ({ l, c })));
     const i = all.findIndex((x) => x.l.id === id);
@@ -348,7 +350,7 @@ function LessonView({ lessonId, onNext, onBoss }: { lessonId: string; onNext: (i
 }
 
 function Boss({ chapterId, onDone }: { chapterId: string; onDone: () => void }) {
-  const ch = ['network', 'cloud', 'forex'].flatMap((s) => getStream(s as 'network').chapters).find((c) => c.id === chapterId)!;
+  const ch = ['network', 'cloud', 'forex', 'dev'].flatMap((s) => getStream(s as 'network').chapters).find((c) => c.id === chapterId)!;
   const { reward } = useGame();
   const [bossHp, setBossHp] = useState(1);
   const [hearts, setHearts] = useState(3);

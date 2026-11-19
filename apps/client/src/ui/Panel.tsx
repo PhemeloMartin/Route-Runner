@@ -29,6 +29,6 @@ export function Bar({ value, color }: { value: number; color: string }) {
   );
 }
 
-export const STREAM_COLOR: Record<string, string> = { network: '#3b82f6', cloud: '#06b6d4', forex: '#22c55e', general: '#f59e0b' };
-export const STREAM_ICON: Record<string, string> = { network: '🌐', cloud: '☁️', forex: '📈' };
-export const STREAM_NAME: Record<string, string> = { network: 'Network Engineer', cloud: 'Cloud Engineer', forex: 'Forex Trader' };
+export const STREAM_COLOR: Record<string, string> = { network: '#3b82f6', cloud: '#06b6d4', forex: '#22c55e', dev: '#8b5cf6', general: '#f59e0b' };
+export const STREAM_ICON: Record<string, string> = { network: '🌐', cloud: '☁️', forex: '📈', dev: '📱' };
+export const STREAM_NAME: Record<string, string> = { network: 'Network Engineer', cloud: 'Cloud Engineer', forex: 'Forex Trader', dev: 'App & DevOps Engineer' };

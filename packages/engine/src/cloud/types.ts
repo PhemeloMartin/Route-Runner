@@ -106,6 +106,8 @@ export interface K8sState {
   ingresses: { name: string; ns: string; host: string; service: string }[];
   events: string[];
   seq: number;
+  /** Images pushed to the team's registry (e.g. ghcr.io/...) that nodes can pull. */
+  registry?: string[];
 }
 
 // ------------------------------------------------------------ aws

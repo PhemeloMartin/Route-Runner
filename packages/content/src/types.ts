@@ -1,4 +1,4 @@
-export type StreamId = 'network' | 'cloud' | 'forex';
+export type StreamId = 'network' | 'cloud' | 'forex' | 'dev';
 
 export type QuestionType = 'single' | 'multi' | 'input';
 
@@ -23,7 +23,7 @@ export interface Term {
 }
 
 export interface LabRef {
-  kind: 'network' | 'linux' | 'cloud' | 'hpc' | 'rack' | 'pcbuild' | 'cable' | 'vm' | 'trading' | 'drill' | 'k8s3d';
+  kind: 'network' | 'linux' | 'cloud' | 'hpc' | 'dev' | 'rack' | 'pcbuild' | 'cable' | 'vm' | 'trading' | 'drill' | 'k8s3d';
   id: string;
   title?: string;
 }

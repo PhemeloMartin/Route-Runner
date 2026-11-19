@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ACHIEVEMENTS } from '@route-runner/content';
 import { api } from '../api';
 import { useGame } from '../store';
+import { detectQuality } from '../world/shared';
 import { Bar, Panel, STREAM_COLOR, STREAM_ICON, STREAM_NAME } from '../ui/Panel';
 
 const PALETTE: Record<string, string[]> = {
@@ -98,7 +99,7 @@ export default function ProfilePanel() {
             <label className="row"><input type="checkbox" checked={profile.settings.hints !== false} onChange={(e) => void setSetting('hints', e.target.checked)} /> Show "Route Runner hint" explanations in labs</label>
             <label className="row"><input type="checkbox" checked={!!profile.settings.freeRoam} onChange={(e) => void setSetting('freeRoam', e.target.checked)} /> Free roam: unlock all chapters (for revision)</label>
             <label className="row"><input type="checkbox" checked={profile.settings.sound !== false} onChange={(e) => void setSetting('sound', e.target.checked)} /> Sound effects</label>
-            <label className="row">Graphics <select value={profile.settings.quality ?? 'high'} onChange={(e) => void setSetting('quality', e.target.value)}><option value="high">High (shadows)</option><option value="low">Low (older laptops)</option></select></label>
+            <label className="row">Graphics <select value={profile.settings.quality ?? 'auto'} onChange={(e) => void setSetting('quality', e.target.value)}><option value="auto">Auto - pick for my graphics chip ({detectQuality()})</option><option value="ultra">Ultra - everything on (gaming GPUs)</option><option value="high">High - soft shadows and glowing lights</option><option value="medium">Medium - shadows, smooth edges (most laptops)</option><option value="low">Low - fastest</option></select></label>
             <label className="row">Read-aloud voice <select value={profile.settings.voice ?? ''} onChange={(e) => void setSetting('voice', e.target.value)}><option value="">Default</option>{voices.map((v) => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}</select></label>
           </div>
           <div className="card col">

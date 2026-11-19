@@ -2,7 +2,7 @@
  * Game progression: XP, levels, ranks, streaks and spaced repetition.
  */
 
-export type StreamId = 'network' | 'cloud' | 'forex';
+export type StreamId = 'network' | 'cloud' | 'forex' | 'dev';
 
 /** XP needed to REACH a level: grows gently so early levels come fast and later ones feel earned. */
 export function xpForLevel(level: number): number {
@@ -44,6 +44,15 @@ export const RANKS: Record<StreamId, { minXp: number; title: string; plain: stri
     { minXp: 5500, title: 'Swing Trader', plain: 'You follow a written plan across days and weeks.' },
     { minXp: 9000, title: 'Disciplined Trader', plain: 'Your journal proves consistency on demo.' },
     { minXp: 14000, title: 'Evaluation-Ready Trader', plain: 'Ready to consider a funded-account challenge - still demo first!' },
+  ],
+  dev: [
+    { minXp: 0, title: 'Hello World', plain: 'You can run code and read an error message.' },
+    { minXp: 500, title: 'Junior Developer', plain: 'You build small Flutter screens and ASP.NET endpoints.' },
+    { minXp: 1500, title: 'App Builder', plain: 'Your Flutter app talks to your own API and database.' },
+    { minXp: 3200, title: 'Full-Stack Developer', plain: 'Mobile front end, secure .NET back end, real data.' },
+    { minXp: 6000, title: 'DevOps Engineer', plain: 'Tests, pipelines and containers ship your code automatically.' },
+    { minXp: 10000, title: 'Platform Engineer', plain: 'Kubernetes, Helm and GitOps run apps at scale.' },
+    { minXp: 15000, title: 'Software Architect', plain: 'You design systems that are secure, observable and easy to change.' },
   ],
 };
 

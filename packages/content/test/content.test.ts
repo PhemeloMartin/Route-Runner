@@ -3,9 +3,9 @@ import { ALL_CHAPTERS, ALL_LESSONS, CCNA_DOMAINS, FLASHCARDS, NETWORK_LABS, SHEL
 import { ShellSession, cloneTopology, ping } from '@route-runner/engine';
 
 describe('curriculum integrity', () => {
-  it('has all three streams with substantial content', () => {
-    expect(STREAMS.map((s) => s.id)).toEqual(['network', 'cloud', 'forex']);
-    expect(ALL_LESSONS.length).toBeGreaterThanOrEqual(110);
+  it('has all four streams with substantial content', () => {
+    expect(STREAMS.map((s) => s.id)).toEqual(['network', 'cloud', 'forex', 'dev']);
+    expect(ALL_LESSONS.length).toBeGreaterThanOrEqual(150);
     for (const s of STREAMS) expect(s.chapters.length).toBeGreaterThanOrEqual(10);
   });
 
@@ -26,7 +26,7 @@ describe('curriculum integrity', () => {
 
   it('every question is answerable and explained', () => {
     const all = STREAMS.flatMap((s) => questionBank(s.id));
-    expect(all.length).toBeGreaterThan(550);
+    expect(all.length).toBeGreaterThan(750);
     const qids = new Set<string>();
     for (const q of all) {
       expect(qids.has(q.id), `duplicate question id ${q.id}`).toBe(false);
@@ -64,12 +64,12 @@ describe('curriculum integrity', () => {
     for (const c of ALL_CHAPTERS)
       for (const ref of [...c.labs, ...c.lessons.flatMap((l) => l.labs)]) {
         if (ref.kind === 'network') expect(net.has(ref.id), `${c.id} -> network:${ref.id}`).toBe(true);
-        if (['linux', 'cloud', 'hpc'].includes(ref.kind)) expect(shell.has(ref.id), `${c.id} -> ${ref.kind}:${ref.id}`).toBe(true);
+        if (['linux', 'cloud', 'hpc', 'dev', 'k8s3d'].includes(ref.kind)) expect(shell.has(ref.id), `${c.id} -> ${ref.kind}:${ref.id}`).toBe(true);
       }
   });
 
   it('creates hundreds of flashcards from key terms', () => {
-    expect(FLASHCARDS.length).toBeGreaterThan(600);
+    expect(FLASHCARDS.length).toBeGreaterThan(900);
     expect(new Set(FLASHCARDS.map((f) => f.id)).size).toBe(FLASHCARDS.length);
   });
 });
@@ -102,6 +102,44 @@ describe('labs are solvable and start unsolved', () => {
     for (const lab of SHELL_LABS) {
       const sh = ShellSession.create(lab.machine);
       expect(sh.exec('whoami').output.trim(), lab.id).toBe('phemelo');
+    }
+  });
+
+  it('every App & DevOps mission starts unsolved and can be completed with the hinted commands', () => {
+    const plays: Record<string, string[]> = {
+      'aspnet-api': ['dotnet --version', 'dotnet new webapi -n TodoApi', 'cd TodoApi', 'dotnet run', 'curl localhost:5080/weatherforecast'],
+      'aspnet-ef': ['cd ~/labs/ef-core/TodoApi', 'dotnet add package Microsoft.EntityFrameworkCore.Sqlite', 'dotnet add package Microsoft.EntityFrameworkCore.Design', 'dotnet tool install --global dotnet-ef', 'dotnet ef migrations add InitialCreate', 'dotnet ef database update', 'dotnet run', "curl -X POST localhost:5080/todos -d '{\"title\":\"Buy airtime\"}'"],
+      'flutter-first': ['flutter doctor', 'flutter create kasi_market', 'cd kasi_market', 'flutter pub add http', 'flutter test', 'flutter run -d chrome'],
+      'ci-pipeline': ['cd ~/labs/pipeline', 'git init', 'git add .', 'git commit -m "Initial commit"', 'act -l'],
+      'helm-ship': ['helm repo add bitnami https://charts.bitnami.com/bitnami', 'cd ~/labs/helm', 'helm install todo ./charts/todo-api', 'helm upgrade todo ./charts/todo-api --set replicaCount=4'],
+    };
+    const edits: Record<string, (sh: ShellSession) => void> = {
+      'aspnet-api': (sh) => sh.saveFromEditor('/home/phemelo/TodoApi/Program.cs', sh.vfs.read('/home/phemelo/TodoApi/Program.cs')!.replace('app.Run();', 'app.MapGet("/hello", () => "Hello from Phemelo");\napp.Run();')),
+      'flutter-first': (sh) => sh.saveFromEditor('/home/phemelo/kasi_market/lib/main.dart', sh.vfs.read('/home/phemelo/kasi_market/lib/main.dart')!.replace("'Flutter Demo Home Page'", "'Kasi Market'")),
+      'ci-pipeline': (sh) => sh.saveFromEditor('/home/phemelo/labs/pipeline/.github/workflows/ci.yml', sh.vfs.read('/home/phemelo/labs/pipeline/.github/workflows/ci.yml')!.replace('      # TODO', '      - name: Test\n        run: dotnet test\n      # TODO')),
+      'helm-ship': () => undefined,
+    };
+    const after: Record<string, string[]> = {
+      'aspnet-api': ['dotnet run', 'curl localhost:5080/hello'],
+      'flutter-first': ['flutter test', 'flutter run -d chrome'],
+      'ci-pipeline': ['act'],
+      'helm-ship': ['helm upgrade todo ./charts/todo-api --reuse-values --set image.tag=9.9', 'helm rollback todo 2', 'kubectl get pods'],
+    };
+    for (const lab of SHELL_LABS.filter((l) => l.kind === 'dev')) {
+      const sh = ShellSession.create(lab.machine);
+      const seen: string[] = [];
+      const done = new Set<string>();
+      const step = (cmd: string) => {
+        const r = sh.exec(cmd);
+        const ev = r.events ?? [];
+        seen.push(...ev);
+        for (const o of lab.objectives) if (o.check(sh.s, ev)) done.add(o.id);
+      };
+      for (const o of lab.objectives) expect(o.check(sh.s, []), `${lab.id}/${o.id} must start unsolved`).toBe(false);
+      for (const c of plays[lab.id] ?? []) step(c);
+      edits[lab.id]?.(sh);
+      for (const c of after[lab.id] ?? []) step(c);
+      expect([...lab.objectives.map((o) => o.id)].filter((id) => !done.has(id)), `${lab.id} unsolved objectives`).toEqual([]);
     }
   });
 

@@ -33,14 +33,14 @@ export function TitleScreen() {
       <div className="title-card">
         <div className="logo">ROUTE RUNNER</div>
         <div style={{ fontSize: 18, marginTop: -2, display: 'inline-block', background: 'rgba(5, 9, 20, 0.78)', padding: '6px 16px', borderRadius: 12, color: '#cbd5e1' }}>
-          {profile.name}'s journey to <span style={{ color: STREAM_COLOR.network }}>Network Engineer</span> · <span style={{ color: STREAM_COLOR.cloud }}>Cloud Engineer</span> · <span style={{ color: STREAM_COLOR.forex }}>Forex Trader</span>
+          {profile.name}'s journey to <span style={{ color: STREAM_COLOR.network }}>Network Engineer</span> · <span style={{ color: STREAM_COLOR.cloud }}>Cloud Engineer</span> · <span style={{ color: STREAM_COLOR.dev }}>App &amp; DevOps</span> · <span style={{ color: STREAM_COLOR.forex }}>Forex Trader</span>
         </div>
         <div className="card" style={{ marginTop: 26, textAlign: 'left' }}>
           {fresh ? (
             <div className="col">
               <h3>Welcome, future engineer 👋</h3>
               <p className="muted" style={{ margin: 0 }}>
-                This is your world. Walk between buildings to learn networking, cloud and forex. Every lesson, lab and drill earns XP. Come back every day for ~1 hour and in about 3 months you'll be ready for the CCNA, comfortable in the cloud and trading a plan on demo.
+                This is your world. Walk between buildings to learn networking, cloud, app development & DevOps, and forex. Every lesson, lab and drill earns XP. Come back every day for ~1 hour and in about 3 months you'll be ready for the CCNA, comfortable in the cloud, shipping Flutter + ASP.NET apps through a pipeline, and trading a plan on demo.
               </p>
               <label className="row">
                 <span className="muted">Your character's name</span>

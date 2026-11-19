@@ -217,4 +217,76 @@ BEGIN
 END;
 `,
   },
+  {
+    id: 2,
+    name: 'App & DevOps stream: allow stream "dev" and lab kind "dev"',
+    // SQLite can't ALTER a CHECK constraint, so each table is rebuilt and its rows copied across
+    // (the standard 12-step table-redefinition procedure). Nothing references these tables, so
+    // foreign keys stay valid; the view that reads xp_events is dropped and recreated around it.
+    sql: `
+DROP VIEW IF EXISTS v_xp_by_stream;
+
+CREATE TABLE lesson_progress_v2 (
+  player_id     INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  lesson_id     TEXT    NOT NULL,
+  stream        TEXT    NOT NULL CHECK (stream IN ('network','cloud','forex','dev')),
+  chapter_id    TEXT    NOT NULL,
+  status        TEXT    NOT NULL CHECK (status IN ('started','completed')),
+  best_score    REAL    NOT NULL DEFAULT 0 CHECK (best_score BETWEEN 0 AND 1),
+  attempts      INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  started_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  completed_at  TEXT,
+  PRIMARY KEY (player_id, lesson_id)
+);
+INSERT INTO lesson_progress_v2 SELECT player_id, lesson_id, stream, chapter_id, status, best_score, attempts, started_at, completed_at FROM lesson_progress;
+DROP TABLE lesson_progress;
+ALTER TABLE lesson_progress_v2 RENAME TO lesson_progress;
+CREATE INDEX ix_lesson_progress_stream ON lesson_progress (player_id, stream, status);
+
+CREATE TABLE chapter_progress_v2 (
+  player_id        INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  chapter_id       TEXT    NOT NULL,
+  stream           TEXT    NOT NULL CHECK (stream IN ('network','cloud','forex','dev')),
+  boss_best        REAL    NOT NULL DEFAULT 0 CHECK (boss_best BETWEEN 0 AND 1),
+  boss_defeated_at TEXT,
+  PRIMARY KEY (player_id, chapter_id)
+);
+INSERT INTO chapter_progress_v2 SELECT player_id, chapter_id, stream, boss_best, boss_defeated_at FROM chapter_progress;
+DROP TABLE chapter_progress;
+ALTER TABLE chapter_progress_v2 RENAME TO chapter_progress;
+
+CREATE TABLE xp_events_v2 (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id   INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  stream      TEXT    CHECK (stream IS NULL OR stream IN ('network','cloud','forex','dev')),
+  amount      INTEGER NOT NULL CHECK (amount BETWEEN -10000 AND 10000),
+  reason      TEXT    NOT NULL,
+  ref_id      TEXT,
+  created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+INSERT INTO xp_events_v2 SELECT id, player_id, stream, amount, reason, ref_id, created_at FROM xp_events;
+DROP TABLE xp_events;
+ALTER TABLE xp_events_v2 RENAME TO xp_events;
+CREATE INDEX ix_xp_events_player ON xp_events (player_id, created_at);
+CREATE UNIQUE INDEX ux_xp_once ON xp_events (player_id, reason, ref_id) WHERE reason IN ('lesson','lab','boss','achievement');
+
+CREATE VIEW v_xp_by_stream AS
+  SELECT player_id, COALESCE(stream, 'general') AS stream, SUM(amount) AS xp
+  FROM xp_events GROUP BY player_id, COALESCE(stream, 'general');
+
+CREATE TABLE lab_states_v2 (
+  player_id       INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  kind            TEXT    NOT NULL CHECK (kind IN ('network','linux','vm','cloud','hpc','dev','rack','pcbuild','cable','k8s3d')),
+  lab_id          TEXT    NOT NULL,
+  state_json      TEXT    NOT NULL,
+  objectives_json TEXT    NOT NULL DEFAULT '[]',
+  completed_at    TEXT,
+  updated_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (player_id, kind, lab_id)
+);
+INSERT INTO lab_states_v2 SELECT player_id, kind, lab_id, state_json, objectives_json, completed_at, updated_at FROM lab_states;
+DROP TABLE lab_states;
+ALTER TABLE lab_states_v2 RENAME TO lab_states;
+`,
+  },
 ];

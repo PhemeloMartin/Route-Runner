@@ -35,7 +35,7 @@ export class Game {
     const days = this.db.all<{ day: string }>('SELECT day FROM activity_days WHERE player_id = ? ORDER BY day', [pid]).map((r) => r.day);
     const firstDay = p.created_at.slice(0, 10);
     const dayNumber = Math.floor((Date.parse(sastDate()) - Date.parse(firstDay)) / 86400000) + 1;
-    const streams = (['network', 'cloud', 'forex'] as StreamId[]).map((s) => ({ stream: s, xp: xp[s] ?? 0, ...levelFromXp(xp[s] ?? 0), rank: rankFor(s, xp[s] ?? 0) }));
+    const streams = (['network', 'cloud', 'forex', 'dev'] as StreamId[]).map((s) => ({ stream: s, xp: xp[s] ?? 0, ...levelFromXp(xp[s] ?? 0), rank: rankFor(s, xp[s] ?? 0) }));
     const total = Object.values(xp).reduce((a, b) => a + b, 0);
     return {
       id: p.id,
@@ -113,6 +113,7 @@ export class Game {
     const disciplined = n("SELECT COUNT(*) FROM trades t JOIN trading_accounts a ON a.id = t.account_id WHERE a.player_id = ? AND t.status = 'closed' AND t.sl IS NOT NULL AND COALESCE(t.risk_percent, 100) <= 2.05");
     const journaled = n("SELECT COUNT(*) FROM trades t JOIN trading_accounts a ON a.id = t.account_id WHERE a.player_id = ? AND t.setup IS NOT NULL AND t.setup <> '' AND t.emotion IS NOT NULL AND t.emotion <> ''");
     const capstone = n("SELECT COUNT(*) FROM lab_states WHERE player_id = ? AND lab_id = 'capstone' AND completed_at IS NOT NULL");
+    const devLabs = n("SELECT COUNT(*) FROM lab_states WHERE player_id = ? AND kind = 'dev' AND completed_at IS NOT NULL");
     const tickets = n("SELECT COUNT(*) FROM lab_states WHERE player_id = ? AND lab_id LIKE 'ticket-%' AND completed_at IS NOT NULL");
     const rack = n("SELECT COUNT(*) FROM lab_states WHERE player_id = ? AND kind = 'rack' AND completed_at IS NOT NULL");
     const pc = n("SELECT COUNT(*) FROM lab_states WHERE player_id = ? AND kind = 'pcbuild' AND completed_at IS NOT NULL");
@@ -124,6 +125,8 @@ export class Game {
       ['ten-lessons', lessons >= 10],
       ['fifty-lessons', lessons >= 50],
       ['all-streams', streamsDone >= 3],
+      ['four-streams', streamsDone >= 4],
+      ['shipped-it', devLabs >= 5],
       ['perfect-quiz', perfect >= 1],
       ['first-boss', bosses >= 1],
       ['first-lab', labs >= 1],
@@ -300,7 +303,7 @@ export class Game {
   }
 
   completeLab(pid: number, kind: string, labId: string, minutes: number): Reward {
-    const stream: StreamId = ['network', 'rack', 'pcbuild', 'cable'].includes(kind) ? 'network' : 'cloud';
+    const stream: StreamId = ['network', 'rack', 'pcbuild', 'cable'].includes(kind) ? 'network' : kind === 'dev' ? 'dev' : 'cloud';
     return this.withReward(pid, stream, () => {
       this.db.run(
         `INSERT INTO lab_states (player_id, kind, lab_id, state_json, completed_at) VALUES (?, ?, ?, '{}', strftime('%Y-%m-%dT%H:%M:%fZ','now'))

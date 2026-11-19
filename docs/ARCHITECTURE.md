@@ -30,6 +30,17 @@ It models **decisions**, not electrical signals:
 
 A bash-like tokenizer handles quotes, `$VARS`, globs, pipes, redirection, `&&`/`||`/`;`, for-loops and scripts. It runs over a JSON virtual filesystem with users, permissions and sudo. Commands include apt (internet depends on the VM network mode), systemd, netplan (parses YAML and applies it to the NIC), UFW, ss, curl and nmap. The cloud and HPC tools (docker, kubectl with a reconcile loop, aws, terraform, ansible, slurm) share one machine state, so `curl localhost:8080` reaches a container you just started.
 
+### The developer tools (`engine/src/dev`)
+
+The App & DevOps stream adds a **Dev Studio** machine profile with simulated `dotnet`, `flutter`/`dart`, `helm` and `act`. They model the real commands, files and error messages (NU1101, MSB1003, "doesn't reference Microsoft.EntityFrameworkCore.Design", "is not a valid Dart package name"...) without compiling real code:
+- **dotnet** creates real-looking projects, "compiles" by checking brackets and package references, records EF Core migrations, and a running API answers `curl` by reading the routes in Program.cs / controllers (MapGroup prefixes, route parameters, a CRUD store for todo routes, string-literal endpoints).
+- **helm** renders a chart's values into a Deployment and Service on the simulated cluster and keeps numbered revisions, so upgrade and rollback behave like the real thing; nodes can pull images that were pushed to the simulated registry.
+- **act** parses `.github/workflows/*.yml`, validates triggers, jobs, runners and actions, and **really runs every `run:` step** in the same shell - so a failing `dotnet test` turns the pipeline red and skips dependent jobs.
+
+### Rendering (`client/src/world`)
+
+Smooth heightfield terrain shared with the player controller (`ground.ts`), instanced foliage and grass with wind shaders, procedural canvas textures (nothing to download), a gradient sky driven by SAST time, an environment map captured from that sky for reflections, and shadows that follow the player. Quality tiers (Low / Medium / High / Ultra, default **Auto** from the GPU name) switch shadows, grass density and the post-processing pipeline (bloom, optional N8AO); a PerformanceMonitor steps down automatically. Floating labels are WebGL sprites rather than DOM overlays, because per-frame DOM updates over a live canvas cost more than the whole scene on integrated GPUs.
+
 ## Database design (SQLite)
 
 Why SQLite: the game is single-player and offline, and SQLite gives ACID transactions, foreign keys, CHECK constraints and partial indexes in one file. **sql.js** (SQLite compiled to WebAssembly) avoids native compilation on the learner's Windows PC. After each write, the in-memory database is flushed (debounced) with an atomic **write-temp-then-rename**, and a dated backup is taken at startup (last 7 kept).
@@ -58,6 +69,10 @@ Key decisions:
 - **Multi-player ready.** Every learner table has `player_id REFERENCES players ON DELETE CASCADE`, even though the offline game creates one player.
 - **Integrity in the schema:** CHECK constraints on enums and ranges (scores 0-1, `correct <= total`, a closed trade must have an exit price), `WITHOUT ROWID` for compact keyed tables (`market_candles`, `activity_days`, `flashcard_state`), and indexes that match the dashboard queries.
 - **Forward-only migrations** are recorded in `schema_migrations` and applied in a transaction at startup.
+
+### Migration 2 - adding a stream without losing anyone's progress
+
+SQLite cannot ALTER a CHECK constraint, so migration 2 rebuilds lesson_progress, chapter_progress, xp_events and lab_states with the new allowed values (stream 'dev', lab kind 'dev'), copies every row across, recreates their indexes (including the partial unique index that stops one-time rewards being claimed twice) and the v_xp_by_stream view, all inside the migration transaction. `apps/server/test/migrations.test.ts` builds a version-1 database with progress, upgrades it, and checks nothing was lost.
 
 ## API
 

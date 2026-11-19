@@ -1,7 +1,7 @@
 /** Typed client for the local Route Runner server. */
 
 export interface StreamStat {
-  stream: 'network' | 'cloud' | 'forex';
+  stream: 'network' | 'cloud' | 'forex' | 'dev';
   xp: number;
   level: number;
   current: number;
@@ -28,7 +28,7 @@ export interface Settings {
   hints?: boolean;
   freeRoam?: boolean;
   voice?: string;
-  quality?: 'low' | 'high';
+  quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   sound?: boolean;
 }
 

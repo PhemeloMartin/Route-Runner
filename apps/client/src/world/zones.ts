@@ -8,7 +8,7 @@ export interface Zone {
   color: string;
   pos: [number, number]; // x, z
   size: [number, number, number]; // w, h, d
-  style: 'academy' | 'lab' | 'tower' | 'datacenter' | 'hut' | 'trading' | 'home' | 'hpc' | 'exam' | 'linux';
+  style: 'academy' | 'lab' | 'tower' | 'datacenter' | 'hut' | 'trading' | 'home' | 'hpc' | 'exam' | 'linux' | 'studio';
   panel: PanelId;
 }
 
@@ -21,6 +21,7 @@ export const ZONES: Zone[] = [
   { id: 'linux', name: 'Server Room', subtitle: 'Linux & Virtual Machines', icon: '🐧', color: '#eab308', pos: [22, -3], size: [6, 5, 6], style: 'linux', panel: { kind: 'shelllab', profile: 'linux' } },
   { id: 'hpc', name: 'Supercomputer', subtitle: 'HPC cluster · Slurm · MPI', icon: '🧮', color: '#a855f7', pos: [15, -16], size: [6, 7, 6], style: 'hpc', panel: { kind: 'shelllab', profile: 'hpc', labId: 'hpc-first-job' } },
   { id: 'cloud', name: 'Cloud Tower', subtitle: 'AWS · Docker · Kubernetes · DevOps', icon: '☁️', color: '#06b6d4', pos: [1, -21], size: [6, 12, 6], style: 'tower', panel: { kind: 'academy', stream: 'cloud' } },
+  { id: 'studio', name: 'App Studio', subtitle: 'Flutter · ASP.NET Core · DevOps · Kubernetes', icon: '📱', color: '#8b5cf6', pos: [10, -24], size: [6, 5, 5], style: 'studio', panel: { kind: 'academy', stream: 'dev' } },
   { id: 'trading', name: 'Trading Floor', subtitle: 'Forex lessons · real charts · demo trading', icon: '📈', color: '#22c55e', pos: [-13, -20], size: [8, 4, 6], style: 'trading', panel: { kind: 'trading' } },
   { id: 'exam', name: 'Exam Hall', subtitle: 'CCNA mock exams · drills · flashcards', icon: '🎓', color: '#e11d48', pos: [-6, 8], size: [5, 4, 4], style: 'exam', panel: { kind: 'exam', tab: 'exam' } },
   { id: 'home', name: "Phemelo's Room", subtitle: 'Profile · achievements · save file', icon: '🏠', color: '#ec4899', pos: [9, 4], size: [4, 3.5, 4], style: 'home', panel: { kind: 'profile' } },

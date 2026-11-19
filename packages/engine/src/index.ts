@@ -29,6 +29,7 @@ export { HostSession } from './host/pc.js';
 export { ShellSession } from './shell/shell.js';
 export { createMachine, dhcpLeaseFor, hasInternet, type ShellState, type MachineOptions, type VmNetworkMode } from './shell/state.js';
 export { parseYaml, parseYamlDocs } from './shell/yaml.js';
+export { createDev, checkBrackets, type DevState, type DotnetProject, type FlutterProject, type HelmRelease } from './dev/devtools.js';
 export { createCluster, killNode, reviveNode, reconcile } from './cloud/k8s.js';
 export { createAws } from './cloud/aws.js';
 export type { K8sState, AwsState, DockerState, SlurmState } from './cloud/types.js';

@@ -3,9 +3,9 @@ import { api, type Profile, type Progress, type Reward } from './api';
 import { sfx } from './sfx';
 
 export type PanelId =
-  | { kind: 'academy'; stream: 'network' | 'cloud' | 'forex'; lessonId?: string; chapterId?: string; boss?: boolean }
+  | { kind: 'academy'; stream: 'network' | 'cloud' | 'forex' | 'dev'; lessonId?: string; chapterId?: string; boss?: boolean }
   | { kind: 'netlab'; labId?: string }
-  | { kind: 'shelllab'; labId?: string; profile?: 'linux' | 'cloud' | 'hpc' | 'vm' }
+  | { kind: 'shelllab'; labId?: string; profile?: 'linux' | 'cloud' | 'hpc' | 'vm' | 'dev' }
   | { kind: 'rack' }
   | { kind: 'pcbuild' }
   | { kind: 'cable' }

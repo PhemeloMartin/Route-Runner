@@ -2,6 +2,7 @@ import type { Chapter, Flashcard, Lesson, Question, Stream, StreamId } from './t
 import { NETWORK_CHAPTERS } from './network/index.js';
 import { CLOUD_CHAPTERS } from './cloud/index.js';
 import { FOREX_CHAPTERS } from './forex/index.js';
+import { DEV_CHAPTERS } from './dev/index.js';
 
 export * from './types.js';
 export { chapter } from './dsl.js';
@@ -40,6 +41,16 @@ export const STREAMS: Stream[] = [
     goal: 'Understand how currency markets work, read charts and news, manage risk like a professional and prove consistency on a demo account before risking real money.',
     certs: ['No license needed to trade your own money - but study FSCA rules', 'Optional: CFA Investment Foundations (free)', 'Journal of 100+ demo trades = your real "certificate"'],
     chapters: FOREX_CHAPTERS,
+  },
+  {
+    id: 'dev',
+    title: 'App & DevOps Engineer',
+    tagline: 'Flutter apps, ASP.NET Core APIs, CI/CD pipelines and Kubernetes in depth.',
+    color: '#8b5cf6',
+    building: 'App Studio',
+    goal: 'Build a real product end to end - a Flutter app talking to a secure ASP.NET Core API - and ship it automatically with tests, containers, Helm and GitOps on Kubernetes.',
+    certs: ['CKAD - Certified Kubernetes Application Developer (then CKA)', 'GitHub Foundations and GitHub Actions certifications', 'Microsoft Azure fundamentals / developer certifications (check current exam codes on Microsoft Learn)', 'Flutter: no official cert - published apps and a public repo are your proof'],
+    chapters: DEV_CHAPTERS,
   },
 ];
 
@@ -86,13 +97,17 @@ export function mockExam(count = 60, rnd: () => number = Math.random): Question[
 }
 
 /**
- * The daily quest: one Network lesson every day, plus alternating Cloud / Forex lessons,
- * plus flashcards and drills. ~45-75 minutes. Adapts to what is already completed.
+ * The daily quest: one Network lesson every day (the CCNA is the main goal), plus one lesson from the
+ * other streams in rotation (Cloud, App & DevOps, Forex), plus flashcards and drills. ~45-75 minutes.
+ * Adapts to what is already completed.
  */
 export function dailyQuest(completed: Set<string>, dayNumber: number) {
   const next = (s: StreamId) => stream(s).chapters.flatMap((c) => c.lessons).find((l) => !completed.has(l.id));
-  const second: StreamId = dayNumber % 2 === 0 ? 'cloud' : 'forex';
-  const items = [next('network'), next(second) ?? next(second === 'cloud' ? 'forex' : 'cloud')].filter(Boolean) as Lesson[];
+  const rotation: StreamId[] = ['cloud', 'dev', 'forex'];
+  const start = ((dayNumber % rotation.length) + rotation.length) % rotation.length;
+  const order = [...rotation.slice(start), ...rotation.slice(0, start)];
+  const second = order.map(next).find(Boolean);
+  const items = [next('network'), second].filter(Boolean) as Lesson[];
   return { day: dayNumber, lessons: items, flashcards: 15, drills: dayNumber % 3 === 0 ? 'subnetting' : dayNumber % 3 === 1 ? 'mixed' : 'forex-maths' };
 }
 

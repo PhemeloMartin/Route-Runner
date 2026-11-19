@@ -1,4 +1,5 @@
 import { dir, file, type FsNode } from './vfs.js';
+import type { DevState } from '../dev/devtools.js';
 import type { DockerState, K8sState, AwsState, TfState, SlurmState } from '../cloud/types.js';
 
 export type VmNetworkMode = 'nat' | 'bridged' | 'host-only' | 'internal' | 'cloud';
@@ -38,12 +39,13 @@ export interface ShellState {
   sudoCached: boolean;
   aptUpdated: boolean;
   hw: { cpus: number; ramMb: number; diskGb: number; cpuModel: string };
-  profile: 'vm' | 'cloud' | 'hpc';
+  profile: 'vm' | 'cloud' | 'hpc' | 'dev';
   docker?: DockerState;
   k8s?: K8sState;
   aws?: AwsState;
   tf?: TfState;
   slurm?: SlurmState;
+  dev?: DevState;
 }
 
 export interface MachineOptions {
@@ -51,7 +53,7 @@ export interface MachineOptions {
   user?: string;
   password?: string;
   mode?: VmNetworkMode;
-  profile?: 'vm' | 'cloud' | 'hpc';
+  profile?: 'vm' | 'cloud' | 'hpc' | 'dev';
   cpus?: number;
   ramMb?: number;
   diskGb?: number;

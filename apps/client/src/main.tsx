@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import '@fontsource-variable/inter';
 import './styles.css';
 
 /** Never show a blank screen: if anything crashes, explain and offer a reload. Progress is already saved server-side. */

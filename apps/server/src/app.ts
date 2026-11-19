@@ -17,7 +17,7 @@ export interface App {
 }
 
 const Score = z.object({ correct: z.number().int().min(0), total: z.number().int().min(1), durationS: z.number().int().min(0).max(86400).default(0), detail: z.unknown().optional() });
-const LabKind = z.enum(['network', 'linux', 'vm', 'cloud', 'hpc', 'rack', 'pcbuild', 'cable', 'k8s3d']);
+const LabKind = z.enum(['network', 'linux', 'vm', 'cloud', 'hpc', 'dev', 'rack', 'pcbuild', 'cable', 'k8s3d']);
 
 export async function buildApp(cfg: Config, opts: { db?: Db; logger?: boolean } = {}): Promise<App> {
   const db = opts.db ?? (await Db.open({ file: cfg.dbFile }));

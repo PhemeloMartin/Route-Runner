@@ -63,6 +63,7 @@ export function Hud() {
       <div className="dock">
         <button className="btn" onClick={() => open({ kind: 'academy', stream: 'network' })}>🌐 Network</button>
         <button className="btn" onClick={() => open({ kind: 'academy', stream: 'cloud' })}>☁️ Cloud</button>
+        <button className="btn" onClick={() => open({ kind: 'academy', stream: 'dev' })}>📱 Apps</button>
         <button className="btn" onClick={() => open({ kind: 'academy', stream: 'forex' })}>📈 Forex</button>
         <button className="btn" onClick={() => open({ kind: 'exam', tab: 'cards' })}>🗂️ Flashcards</button>
         <button className="btn" onClick={() => open({ kind: 'exam', tab: 'drills' })}>🎯 Drills</button>

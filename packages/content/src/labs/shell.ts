@@ -9,7 +9,7 @@ export interface ShellObjective {
 
 export interface ShellLab {
   id: string;
-  kind: 'linux' | 'vm' | 'cloud' | 'hpc';
+  kind: 'linux' | 'vm' | 'cloud' | 'hpc' | 'dev';
   title: string;
   brief: string;
   minutes: number;
@@ -186,6 +186,88 @@ export const SHELL_LABS: ShellLab[] = [
       { id: 'done', text: 'The job COMPLETED (check squeue / sacct) and you read its .out file', check: (s) => !!s.slurm?.jobs.some((j) => j.state === 'CD') && s.history.some((h) => /cat .*\.out/.test(h)) },
     ],
     hints: ['sinfo  |  module avail  |  module load openmpi/4.1.6', 'cat ~/jobs/hello_mpi.sh - read the #SBATCH lines', 'sbatch ~/jobs/hello_mpi.sh then squeue (run it a few times - jobs go PD -> R -> done)', 'ls then cat hello-<jobid>.out'],
+  },
+  // ------------------------------------------------------------------ App & DevOps (Dev Studio)
+  {
+    id: 'aspnet-api',
+    kind: 'dev',
+    title: 'ASP.NET Mission 1: Your First Web API',
+    brief: 'Lindiwe needs a back end for Kasi Market. Create an ASP.NET Core Web API with the .NET 10 CLI, run it on Kestrel, call it with curl, then add your own endpoint and see it answer.',
+    minutes: 20,
+    machine: { profile: 'dev', hostname: 'devbox' },
+    objectives: [
+      { id: 'sdk', text: 'Check the installed .NET SDK (dotnet --version)', check: (s) => s.history.some((h) => /dotnet\s+--(version|info)/.test(h)) },
+      { id: 'new', text: 'Create a Web API project called TodoApi in your home folder', check: (s) => !!s.dev?.dotnet.projects.some((p) => p.name === 'TodoApi' && p.template === 'webapi' && !p.dir.includes('/labs/')) },
+      { id: 'run', text: 'Start it with dotnet run (from inside the project folder)', check: (_s, ev) => ev.includes('dotnet:run') },
+      { id: 'weather', text: 'Call GET /weatherforecast with curl and read the JSON', check: (_s, ev) => ev.includes('dotnet:http:GET:/weatherforecast') },
+      { id: 'hello', text: 'Add an endpoint that answers with your name (e.g. "Hello from Phemelo"), restart and curl it', check: (_s, ev) => ev.includes('dotnet:hello') },
+    ],
+    hints: ['dotnet --version', 'dotnet new webapi -n TodoApi   then   cd TodoApi', 'dotnet run   (it keeps running in the background of this simulator)', 'curl localhost:5080/weatherforecast', 'nano Program.cs - above app.Run(); add:  app.MapGet("/hello", () => "Hello from Phemelo");  save (Ctrl+O), exit (Ctrl+X), dotnet run, curl localhost:5080/hello'],
+  },
+  {
+    id: 'aspnet-ef',
+    kind: 'dev',
+    title: 'ASP.NET Mission 2: A Real Database with EF Core',
+    brief: 'The Todo API in ~/labs/ef-core/TodoApi already has a model and a DbContext, but no database packages, tools or migrations - so it does not even build. Wire up EF Core with SQLite, create the schema with a migration, then create and read todos through the API.',
+    minutes: 25,
+    machine: { profile: 'dev', hostname: 'devbox' },
+    objectives: [
+      { id: 'pkgs', text: 'Add Microsoft.EntityFrameworkCore.Sqlite and Microsoft.EntityFrameworkCore.Design', check: (s) => { const x = file(s, `/home/${s.users[1].name}/labs/ef-core/TodoApi/TodoApi.csproj`) ?? ''; return /EntityFrameworkCore\.Sqlite/.test(x) && /EntityFrameworkCore\.Design/.test(x); } },
+      { id: 'tool', text: 'Install the EF Core CLI tool (dotnet-ef)', check: (s) => !!s.dev?.dotnet.tools.includes('dotnet-ef') },
+      { id: 'migration', text: 'Create a migration called InitialCreate', check: (s) => !!s.dev?.dotnet.projects.find((p) => p.dir.endsWith('/labs/ef-core/TodoApi'))?.migrations.some((m) => m.endsWith('_InitialCreate')) },
+      { id: 'db', text: 'Apply it to the database (app.db appears)', check: (s) => !!s.dev?.dotnet.projects.find((p) => p.dir.endsWith('/labs/ef-core/TodoApi'))?.dbUpdated },
+      { id: 'crud', text: 'Run the API, POST a new todo with curl and GET the list back', check: (_s, ev) => ev.includes('dotnet:todo:created') },
+    ],
+    hints: ['cd ~/labs/ef-core/TodoApi   then try dotnet build - read the error', 'dotnet add package Microsoft.EntityFrameworkCore.Sqlite   and   dotnet add package Microsoft.EntityFrameworkCore.Design', 'dotnet tool install --global dotnet-ef', 'dotnet ef migrations add InitialCreate   then   dotnet ef database update', 'dotnet run   then   curl -X POST localhost:5080/todos -H "Content-Type: application/json" -d \'{"title":"Buy airtime"}\'   and   curl localhost:5080/todos'],
+  },
+  {
+    id: 'flutter-first',
+    kind: 'dev',
+    title: 'Flutter Mission: The Kasi Market App',
+    brief: 'Create the Kasi Market Flutter app, add the http package for talking to your API, make the home screen say "Kasi Market", prove it with the widget tests and run it in Chrome.',
+    minutes: 25,
+    machine: { profile: 'dev', hostname: 'devbox' },
+    objectives: [
+      { id: 'doctor', text: 'Check your toolchain with flutter doctor', check: (s) => !!s.dev?.flutter.doctor },
+      { id: 'create', text: 'Create a project named kasi_market (Dart names are lower_snake_case)', check: (s) => !!s.dev?.flutter.projects.some((p) => p.name === 'kasi_market') },
+      { id: 'http', text: 'Add the http package (flutter pub add http)', check: (s) => { const p = s.dev?.flutter.projects.find((x) => x.name === 'kasi_market'); return !!p && /^\s+http:/m.test(file(s, p.dir + '/pubspec.yaml') ?? ''); } },
+      { id: 'title', text: 'Change the home page title in lib/main.dart to "Kasi Market"', check: (s) => { const p = s.dev?.flutter.projects.find((x) => x.name === 'kasi_market'); return !!p && /Kasi Market/.test(file(s, p.dir + '/lib/main.dart') ?? ''); } },
+      { id: 'test', text: 'flutter test passes', check: (s) => !!s.dev?.flutter.projects.find((x) => x.name === 'kasi_market')?.tested },
+      { id: 'run', text: 'Run the app in Chrome (flutter run -d chrome)', check: (s) => s.dev?.flutter.projects.find((x) => x.name === 'kasi_market')?.ran === 'chrome' },
+    ],
+    hints: ['flutter doctor', 'flutter create kasi_market   then   cd kasi_market', 'flutter pub add http   then   cat pubspec.yaml', "nano lib/main.dart - find title: 'Flutter Demo Home Page' and change it to 'Kasi Market'", 'flutter test   then   flutter run -d chrome'],
+  },
+  {
+    id: 'ci-pipeline',
+    kind: 'dev',
+    title: 'DevOps Mission: Turn the Pipeline Green',
+    brief: 'The repo in ~/labs/pipeline has the Todo API, unit tests, a Dockerfile and a GitHub Actions workflow - but the workflow never runs the tests, so broken code could ship. Put the repo under Git, fix the workflow, run it locally with act until it is green, and let it build the container image.',
+    minutes: 25,
+    machine: { profile: 'dev', hostname: 'devbox' },
+    objectives: [
+      { id: 'git', text: 'Initialise Git in ~/labs/pipeline and make a first commit', check: (s) => file(s, `/home/${s.users[1].name}/labs/pipeline/.git`) === '[dir]' && s.history.some((h) => /git commit/.test(h)) },
+      { id: 'list', text: 'List the workflow jobs with act -l', check: (s) => s.history.some((h) => /^act\s+(-l|--list)/.test(h)) },
+      { id: 'test', text: 'Add a step named Test that runs dotnet test to .github/workflows/ci.yml', check: (s) => /run:\s*dotnet test/.test(file(s, `/home/${s.users[1].name}/labs/pipeline/.github/workflows/ci.yml`) ?? '') },
+      { id: 'green', text: 'Run the pipeline with act - green, with the tests included', check: (s, ev) => ev.includes('ci:green') && /run:\s*dotnet test/.test(file(s, `/home/${s.users[1].name}/labs/pipeline/.github/workflows/ci.yml`) ?? '') },
+      { id: 'image', text: 'The docker job built ghcr.io/phemelo/todo-api:1.2', check: (s) => !!s.docker?.images.some((i) => i.repo === 'ghcr.io/phemelo/todo-api' && i.tag === '1.2') },
+    ],
+    hints: ['cd ~/labs/pipeline   then   git init   git add .   git commit -m "Initial commit"', 'act -l   shows the jobs; cat .github/workflows/ci.yml', 'nano .github/workflows/ci.yml - under the Build step add, with the same indentation:   - name: Test   and on the next line   run: dotnet test', 'act   (read every step; red means read the first failure)', 'Try breaking a test on purpose (Assert.Equal(115, 114)) and watch the pipeline go red - that is CI doing its job.'],
+  },
+  {
+    id: 'helm-ship',
+    kind: 'dev',
+    title: 'Kubernetes Mission: Ship It with Helm',
+    brief: 'The CI pipeline pushed ghcr.io/phemelo/todo-api to the registry. Use the Helm chart in ~/labs/helm to install the API on the cluster, scale it, deploy a broken version on purpose and roll back like an on-call engineer.',
+    minutes: 25,
+    machine: { profile: 'dev', hostname: 'devbox' },
+    objectives: [
+      { id: 'repo', text: 'Add the bitnami chart repository and search it', check: (s) => !!s.dev?.helm.repos.some((r) => r.name === 'bitnami') },
+      { id: 'install', text: 'Install ./charts/todo-api as a release named todo', check: (s) => !!s.dev?.helm.releases.some((r) => r.name === 'todo') },
+      { id: 'scale', text: 'Upgrade the release to 4 replicas - 4 pods Running', check: (s) => s.k8s?.deployments.find((d) => d.name === 'todo-todo-api')?.replicas === 4 && s.k8s.pods.filter((p) => p.owner === 'todo-todo-api' && p.status === 'Running').length === 4 },
+      { id: 'break', text: 'Deploy a tag that does not exist (image.tag=9.9) and see ImagePullBackOff', check: (s) => !!s.dev?.helm.releases.find((r) => r.name === 'todo')?.revisions.some((r) => r.values['image.tag'] === '9.9') },
+      { id: 'rollback', text: 'Roll back with helm rollback - every todo pod healthy again (check helm history)', check: (s, ev) => ev.includes('helm:rollback') && !!s.k8s && s.k8s.pods.some((p) => p.owner === 'todo-todo-api') && s.k8s.pods.filter((p) => p.owner === 'todo-todo-api').every((p) => p.status === 'Running') },
+    ],
+    hints: ['helm repo add bitnami https://charts.bitnami.com/bitnami   then   helm search repo bitnami', 'cd ~/labs/helm   cat charts/todo-api/values.yaml   helm install todo ./charts/todo-api', 'helm upgrade todo ./charts/todo-api --set replicaCount=4   then   kubectl get pods', 'helm upgrade todo ./charts/todo-api --reuse-values --set image.tag=9.9   then   kubectl get pods  (and kubectl describe pod ... for the Events)', 'helm history todo   then   helm rollback todo 2   then   kubectl get pods'],
   },
 ];
 

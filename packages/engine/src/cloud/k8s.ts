@@ -48,7 +48,8 @@ function pickNode(k: K8sState): string | undefined {
 export function reconcile(k: K8sState) {
   for (const d of k.deployments) {
     const mine = k.pods.filter((p) => p.owner === d.name && p.ns === d.ns);
-    const healthyImage = imageKnown(d.image);
+    const ref = d.image.includes(':') ? d.image : `${d.image}:latest`;
+    const healthyImage = imageKnown(d.image) || !!k.registry?.includes(ref);
     // replace pods that run an old image (rolling update)
     for (const p of mine) if (p.image !== d.image) k.pods = k.pods.filter((x) => x !== p);
     let current = k.pods.filter((p) => p.owner === d.name && p.ns === d.ns);

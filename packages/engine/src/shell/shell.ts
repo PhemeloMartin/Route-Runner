@@ -8,6 +8,7 @@ import { ansible, ansiblePlaybook, terraform } from '../cloud/iac.js';
 import { aws } from '../cloud/aws.js';
 import { docker } from '../cloud/docker.js';
 import { kubectl, createCluster } from '../cloud/k8s.js';
+import { actionKnown, createDev, dart, devHttp, dotnet, flutter, helm, loadWorkflows, writeFile, WEBAPI_PROGRAM } from '../dev/devtools.js';
 import { mpirun, moduleCmd, nvidiaSmi, sacct, sbatch, scancel, sinfo, squeue, srun, tickSlurm, createSlurm } from '../cloud/slurm.js';
 import { type CmdResult, type Handler, type ShellCtx, fail, ok } from '../cloud/types.js';
 import { inNetwork, isIPv4, prefixToMask, broadcastOf, networkOf as ipNetworkOf } from '../net/ip.js';
@@ -16,7 +17,7 @@ import { type ShellState, createMachine, dhcpLeaseFor, hasInternet, syncAccountF
 import { Vfs, applySymbolic, dir, file, normalizePath, octalToMode, modeToOctal, type FsNode } from './vfs.js';
 import { parseYaml, yget, YamlError } from './yaml.js';
 
-const C = { reset: '\x1b[0m', green: '\x1b[1;32m', blue: '\x1b[1;34m', red: '\x1b[31m', yellow: '\x1b[33m', cyan: '\x1b[36m', bold: '\x1b[1m' };
+const C = { reset: '\x1b[0m', green: '\x1b[1;32m', blue: '\x1b[1;34m', red: '\x1b[31m', yellow: '\x1b[33m', cyan: '\x1b[36m', bold: '\x1b[1m', dim: '\x1b[2m' };
 
 type Pending =
   | { kind: 'sudo'; line: string; tries: number }
@@ -61,6 +62,7 @@ export class ShellSession implements CliSession {
     const sh = new ShellSession(createMachine(opts));
     if (opts.profile === 'cloud') seedCloud(sh);
     if (opts.profile === 'hpc') seedHpc(sh);
+    if (opts.profile === 'dev') seedDev(sh);
     return sh;
   }
 
@@ -75,6 +77,8 @@ export class ShellSession implements CliSession {
   banner(): string {
     if (this.s.profile === 'hpc')
       return `${C.bold}Welcome to the Route Runner HPC cluster (lengau-sim)${C.reset}\n * Login node: compile and submit jobs here. Do NOT run heavy work on the login node.\n * Try: sinfo, module avail, cat ~/jobs/hello_mpi.sh, sbatch ~/jobs/hello_mpi.sh, squeue\n\n`;
+    if (this.s.profile === 'dev')
+      return `${C.bold}Welcome to the Route Runner Dev Studio${C.reset} (Ubuntu 24.04 · .NET 10 · Flutter 3 · Docker · Kubernetes · Helm)\n * Tools: dotnet, flutter, dart, git, docker, kubectl, helm, act (runs GitHub Actions locally), nano\n * Try: dotnet --version, flutter doctor, ls ~/labs, cat ~/README-dev.txt\n\n`;
     if (this.s.profile === 'cloud')
       return `${C.bold}Welcome to Route Runner CloudShell${C.reset} (af-south-1, Cape Town)\n * Tools: docker, kubectl, aws, terraform, ansible\n * Try: kubectl get nodes, docker run hello-world, aws ec2 describe-vpcs, cd ~/terraform-demo\n\n`;
     return `Welcome to Ubuntu 24.04.3 LTS (GNU/Linux 6.8.0-48-generic x86_64)\n\n * Documentation:  https://help.ubuntu.com\n * Support:        https://ubuntu.com/pro\n\n  System information as of ${new Date().toUTCString()}\n\n  System load:  0.08               Processes:             121\n  Usage of /:   23.4% of 24.44GB   Users logged in:       1\n  Memory usage: 11%                IPv4 address for ${this.s.net.iface}: ${this.s.net.ip ?? '(none)'}\n\nType "help" for the Route Runner command list. Read README.txt to begin.\n\n`;
@@ -492,8 +496,9 @@ export class ShellSession implements CliSession {
  Services:  systemctl (status/start/stop/restart/enable/disable) service journalctl
  Network:   ip (a/r/link/neigh) ping traceroute ss netstat ifconfig curl wget dig nslookup host nmap netplan ufw ssh ssh-keygen scp
  Scripts:   bash script.sh, ./script.sh, VAR=value, for x in ...; do ...; done, crontab
- Cloud:     docker kubectl aws terraform ansible ansible-playbook
- HPC:       sinfo squeue sbatch scancel sacct srun module mpirun nvidia-smi
+ Cloud:     docker kubectl aws terraform ansible ansible-playbook helm
+ Dev:       dotnet (new/build/run/test/add package/ef) flutter dart act (GitHub Actions)   [Dev Studio]
+ HPC:      sinfo squeue sbatch scancel sacct srun module mpirun nvidia-smi
  Learning:  man <cmd>  explain <cmd>
 `),
       man: (_c, a) => (a[0] && MAN[a[0]] ? ok(`${a[0].toUpperCase()}(1)\n\nNAME\n       ${a[0]} - ${MAN[a[0]]}\n\n(Route Runner short man page. Real systems: press q to quit man.)\n`) : fail(a[0] ? `No manual entry for ${a[0]}` : 'What manual page do you want?\nFor example, try \'man man\'.')),
@@ -1078,7 +1083,11 @@ export class ShellSession implements CliSession {
       ansible,
       'ansible-playbook': ansiblePlaybook,
       minikube: (_c, a) => (a[0] === 'status' ? ok('minikube\ntype: Control Plane\nhost: Running\nkubelet: Running\napiserver: Running\nkubeconfig: Configured\n') : ok('😄  minikube v1.34.0 on Ubuntu 24.04\n✨  Using the docker driver\n🏄  Done! kubectl is now configured to use "minikube" cluster\n')),
-      helm: (_c, a) => (a[0] === 'version' ? ok('version.BuildInfo{Version:"v3.16.2"}\n') : ok(`NAME: ${a[1] ?? 'release'}\nSTATUS: deployed\nREVISION: 1\n`)),
+      helm,
+      dotnet,
+      flutter,
+      dart,
+      act: (_c, a) => self.act(a),
       git: (_c, a) => self.git(a),
       sbatch,
       squeue,
@@ -1365,7 +1374,20 @@ export class ShellSession implements CliSession {
   }
 
   private curl(a: string[]): CmdResult {
-    const url = a.find((x) => !x.startsWith('-')) ?? '';
+    const valueFlags = ['-X', '--request', '-d', '--data', '--data-raw', '-H', '--header', '-o', '--output', '-u', '-A'];
+    let method = '';
+    let data = '';
+    let url = '';
+    for (let i = 0; i < a.length; i++) {
+      if (valueFlags.includes(a[i])) {
+        const v = a[++i] ?? '';
+        if (a[i - 1] === '-X' || a[i - 1] === '--request') method = v.toUpperCase();
+        if (a[i - 1].startsWith('-d') || a[i - 1].startsWith('--data')) data = v;
+        continue;
+      }
+      if (!a[i].startsWith('-') && !url) url = a[i];
+    }
+    if (!method) method = data ? 'POST' : a.includes('-I') ? 'HEAD' : 'GET';
     if (!url) return fail("curl: try 'curl --help' or 'curl --manual' for more information");
     const m = url.match(/^(?:(https?):\/\/)?([^/:]+)(?::(\d+))?(\/.*)?$/);
     if (!m) return fail(`curl: (3) URL rejected: Bad hostname`, 3);
@@ -1375,6 +1397,19 @@ export class ShellSession implements CliSession {
     const r = this.resolve(host);
     if (!r.ip) return fail(`curl: (6) Could not resolve host: ${host}`, 6);
     const local = r.ip.startsWith('127.') || r.ip === this.s.net.ip;
+    if (local && this.s.dev) {
+      const reply = devHttp(this.ctx(false), port, method === 'HEAD' ? 'GET' : method, m[4] ?? '/', data);
+      if (reply) {
+        this.events.push(...reply.events);
+        const reason: Record<number, string> = { 200: 'OK', 201: 'Created', 204: 'No Content', 400: 'Bad Request', 404: 'Not Found', 405: 'Method Not Allowed' };
+        const verbose = a.includes('-i') || a.includes('-v') || headOnly;
+        const head = `HTTP/1.1 ${reply.status} ${reason[reply.status] ?? ''}\nContent-Type: ${reply.body.startsWith('{') || reply.body.startsWith('[') ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8'}\nDate: ${new Date().toUTCString()}\nServer: Kestrel\n`;
+        if (headOnly) return ok(head);
+        const body = reply.body ? reply.body + '\n' : '';
+        if (reply.status >= 400 && !verbose && !body) return ok(`${C.dim}(HTTP ${reply.status} ${reason[reply.status] ?? ''} - empty body; add -i to see status lines)${C.reset}\n`);
+        return ok((verbose ? head + '\n' : '') + body);
+      }
+    }
     if (local) {
       const web = this.s.services.nginx?.active ? 'nginx' : this.s.services.apache2?.active ? 'apache2' : undefined;
       const k8sNode = this.s.k8s?.services.find((s) => s.nodePort === port);
@@ -1557,6 +1592,77 @@ export class ShellSession implements CliSession {
     return fail(`${user}@${hostRaw}: Permission denied (publickey).`, 255);
   }
 
+  private act(a: string[]): CmdResult {
+    if (!this.s.dev) return fail("Command 'act' not found. (Install: curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash)", 127);
+    const ctx = this.ctx(false);
+    const root = this.s.cwd;
+    const { workflows, errors } = loadWorkflows(ctx, root);
+    if (errors.length) {
+      this.events.push('ci:invalid');
+      return fail(`${C.red}Error: workflow is not valid${C.reset}\n${errors.map((e) => '  - ' + e).join('\n')}`);
+    }
+    const event = a.find((x) => !x.startsWith('-')) ?? 'push';
+    if (a.includes('-l') || a.includes('--list')) {
+      const rows = workflows.flatMap((w) => w.jobs.map((j, i) => [String(i), j.id, j.name, w.name, w.file, w.events.join(',')]));
+      return ok(['Stage  Job ID  Job name  Workflow name  Workflow file  Events', ...rows.map((r) => r.join('  '))].join('\n') + '\n');
+    }
+    const chosen = workflows.filter((w) => w.events.includes(event) || w.events.includes('workflow_dispatch'));
+    if (!chosen.length) return ok(`No workflows are triggered by the "${event}" event. (Workflows here run on: ${workflows.flatMap((w) => w.events).join(', ')})\n`);
+    const out: string[] = [];
+    let allOk = true;
+    const savedCwd = this.s.cwd;
+    for (const w of chosen) {
+      const done = new Set<string>();
+      const order = [...w.jobs].sort((x, y) => (x.needs.includes(y.id) ? 1 : y.needs.includes(x.id) ? -1 : 0));
+      for (const j of order) {
+        const tag = `[${w.name}/${j.name}]`;
+        if (j.needs.some((n) => !done.has(n))) {
+          out.push(`${C.yellow}${tag} ⏭  Skipped (needs: ${j.needs.join(', ')} failed)${C.reset}`);
+          continue;
+        }
+        out.push(`${C.cyan}${tag}${C.reset} 🚀  Start image=catthehacker/ubuntu:act-latest (runs-on: ${j.runsOn})`);
+        let jobOk = true;
+        for (const st of j.steps) {
+          out.push(`${C.cyan}${tag}${C.reset}   ⭐ Run Main ${st.name}`);
+          if (st.uses) {
+            if (!actionKnown(st.uses)) {
+              out.push(`${C.cyan}${tag}${C.reset}   ${C.red}❌  Failure - Main ${st.name}${C.reset}\n      Unable to resolve action \`${st.uses}\`, repository or version not found`);
+              jobOk = false;
+              break;
+            }
+            out.push(`${C.cyan}${tag}${C.reset}   ${C.green}✅  Success - Main ${st.name}${C.reset}`);
+            continue;
+          }
+          this.s.cwd = st.workdir ? normalizePath(st.workdir, root, this.home) : root;
+          let stepOk = true;
+          for (const line of (st.run ?? '').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))) {
+            const r = this.runLine(line);
+            const text = (r.out + (r.err ? (r.out ? '\n' : '') + r.err : '')).replace(/\n+$/, '');
+            if (text) out.push(...text.split('\n').slice(0, 14).map((l) => `  | ${l}`));
+            if (r.code !== 0) {
+              stepOk = false;
+              break;
+            }
+          }
+          this.s.cwd = savedCwd;
+          out.push(stepOk ? `${C.cyan}${tag}${C.reset}   ${C.green}✅  Success - Main ${st.name}${C.reset}` : `${C.cyan}${tag}${C.reset}   ${C.red}❌  Failure - Main ${st.name}${C.reset}`);
+          if (!stepOk) {
+            jobOk = false;
+            break;
+          }
+        }
+        out.push(jobOk ? `${C.cyan}${tag}${C.reset} 🏁  ${C.green}Job succeeded${C.reset}` : `${C.cyan}${tag}${C.reset} 🏁  ${C.red}Job failed${C.reset}`);
+        if (jobOk) done.add(j.id);
+        allOk &&= jobOk;
+      }
+      this.s.dev.ci.runs.push({ workflow: w.file, ok: allOk, at: Date.now() });
+    }
+    this.s.cwd = savedCwd;
+    this.events.push(allOk ? 'ci:green' : 'ci:red');
+    out.push('', allOk ? `${C.green}Pipeline green ✔${C.reset} - on GitHub this run would show a green tick on the commit.` : `${C.red}Pipeline red ✘${C.reset} - read the first failing step above, fix it, and run act again.`);
+    return allOk ? ok(out.join('\n') + '\n') : { out: '', err: out.join('\n'), code: 1 };
+  }
+
   private git(a: string[]): CmdResult {
     const [sub] = a;
     const repo = `${this.s.cwd}/.git`;
@@ -1616,6 +1722,52 @@ function seedCloud(sh: ShellSession) {
   w(`${h}/terraform-demo/main.tf`, 'terraform {\n  required_providers {\n    aws = {\n      source  = "hashicorp/aws"\n      version = "~> 5.0"\n    }\n  }\n}\n\nprovider "aws" {\n  region = "af-south-1"\n}\n\nresource "aws_vpc" "main" {\n  cidr_block = "10.0.0.0/16"\n}\n\nresource "aws_subnet" "public" {\n  cidr_block              = "10.0.1.0/24"\n  availability_zone       = "af-south-1a"\n  map_public_ip_on_launch = "true"\n}\n\nresource "aws_instance" "web" {\n  ami           = "ami-0ubuntu2404"\n  instance_type = "t3.micro"\n}\n');
   w(`${h}/ansible/inventory.ini`, '[routers]\nR1 ansible_host=192.168.1.1\nR2 ansible_host=192.168.1.2\n\n[switches]\nS1 ansible_host=192.168.1.11\n\n[network:children]\nrouters\nswitches\n');
   w(`${h}/ansible/backup-configs.yml`, '- name: Back up running configs\n  hosts: routers\n  gather_facts: false\n  tasks:\n    - name: Show version\n      ios_command:\n        commands: show version\n    - name: Save running-config to a file\n      ios_config:\n        backup: yes\n');
+}
+
+function seedDev(sh: ShellSession) {
+  const s = sh.s;
+  s.hostname = 'devbox';
+  for (const p of ['docker.io', 'git', 'kubectl', 'tree', 'curl', 'wget', 'dotnet-sdk-10.0', 'nano']) if (!s.packages.includes(p)) s.packages.push(p);
+  s.services.docker = { active: true, enabled: true };
+  if (!s.groups.includes('docker')) s.groups.push('docker');
+  s.users.find((u) => u.name === s.user)!.groups.push('docker');
+  syncAccountFiles(s);
+  s.dev = createDev();
+  s.k8s = createCluster('kind-dev');
+  // the CI pipeline already pushed version 1.0 and 1.1 of the API to the team registry
+  s.k8s.registry = ['ghcr.io/phemelo/todo-api:1.0', 'ghcr.io/phemelo/todo-api:1.1'];
+  const h = `/home/${s.user}`;
+  const ctx = { s, vfs: sh.vfs, write: (p: string, c: string) => sh.vfs.write(p, c, s.user) } as unknown as Parameters<typeof writeFile>[0];
+  const w = (p: string, c: string) => writeFile(ctx, `${h}/${p}`, c);
+  w('README-dev.txt', 'Dev Studio - your practice machine for the App & DevOps stream\n\n  ~/labs/ef-core   ASP.NET Core API that needs a real database (EF Core + SQLite)\n  ~/labs/pipeline  A repo with an API, tests and a GitHub Actions workflow to fix\n  ~/labs/helm      A Helm chart for the Todo API, ready to ship to Kubernetes\n\nUseful:  dotnet new list   flutter doctor   kubectl get nodes   helm version   act -l\nEdit files with: nano <file>  (Ctrl+O save, Ctrl+X exit)\n');
+
+  // --- EF Core lab: an API with a model and DbContext, but no database packages yet
+  const ef = 'labs/ef-core/TodoApi';
+  w(`${ef}/TodoApi.csproj`, '<Project Sdk="Microsoft.NET.Sdk.Web">\n\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n  </PropertyGroup>\n\n  <ItemGroup>\n    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />\n  </ItemGroup>\n\n</Project>\n');
+  w(`${ef}/Models/Todo.cs`, 'namespace TodoApi.Models;\n\n/// <summary>One row in the Todos table.</summary>\npublic class Todo\n{\n    public int Id { get; set; }              // primary key (EF Core spots "Id" automatically)\n    public required string Title { get; set; }\n    public bool IsComplete { get; set; }\n}\n');
+  w(`${ef}/Data/AppDbContext.cs`, 'using Microsoft.EntityFrameworkCore;\nusing TodoApi.Models;\n\nnamespace TodoApi.Data;\n\n/// <summary>The bridge between C# objects and the database.</summary>\npublic class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)\n{\n    public DbSet<Todo> Todos => Set<Todo>();\n}\n');
+  w(`${ef}/Program.cs`, 'using Microsoft.EntityFrameworkCore;\nusing TodoApi.Data;\nusing TodoApi.Models;\n\nvar builder = WebApplication.CreateBuilder(args);\n\n// Register the DbContext with dependency injection, using SQLite (a file called app.db)\nbuilder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlite("Data Source=app.db"));\nbuilder.Services.AddOpenApi();\n\nvar app = builder.Build();\napp.MapOpenApi();\n\nvar todos = app.MapGroup("/todos");\n\ntodos.MapGet("/", async (AppDbContext db) => await db.Todos.ToListAsync());\n\ntodos.MapGet("/{id}", async (int id, AppDbContext db) =>\n    await db.Todos.FindAsync(id) is Todo t ? Results.Ok(t) : Results.NotFound());\n\ntodos.MapPost("/", async (Todo todo, AppDbContext db) =>\n{\n    db.Todos.Add(todo);\n    await db.SaveChangesAsync();\n    return Results.Created($"/todos/{todo.Id}", todo);\n});\n\ntodos.MapPut("/{id}", async (int id, Todo input, AppDbContext db) =>\n{\n    var todo = await db.Todos.FindAsync(id);\n    if (todo is null) return Results.NotFound();\n    todo.Title = input.Title;\n    todo.IsComplete = input.IsComplete;\n    await db.SaveChangesAsync();\n    return Results.NoContent();\n});\n\ntodos.MapDelete("/{id}", async (int id, AppDbContext db) =>\n{\n    if (await db.Todos.FindAsync(id) is not Todo todo) return Results.NotFound();\n    db.Todos.Remove(todo);\n    await db.SaveChangesAsync();\n    return Results.NoContent();\n});\n\napp.Run();\n');
+  w(`${ef}/Properties/launchSettings.json`, '{\n  "profiles": {\n    "http": {\n      "commandName": "Project",\n      "applicationUrl": "http://localhost:5080",\n      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }\n    }\n  }\n}\n');
+  w(`${ef}/appsettings.json`, '{\n  "Logging": { "LogLevel": { "Default": "Information" } },\n  "AllowedHosts": "*"\n}\n');
+
+  // --- Pipeline lab: API + tests + a workflow that is missing its test step
+  const pl = 'labs/pipeline';
+  w(`${pl}/TodoApi/TodoApi.csproj`, '<Project Sdk="Microsoft.NET.Sdk.Web">\n\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n  </PropertyGroup>\n\n  <ItemGroup>\n    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />\n  </ItemGroup>\n\n</Project>\n');
+  w(`${pl}/TodoApi/Program.cs`, WEBAPI_PROGRAM);
+  w(`${pl}/TodoApi/PriceCalculator.cs`, 'namespace TodoApi;\n\n/// <summary>VAT maths for the Kasi Market API (South African VAT is 15%).</summary>\npublic static class PriceCalculator\n{\n    public const decimal VatRate = 0.15m;\n\n    public static decimal WithVat(decimal price) => Math.Round(price * (1 + VatRate), 2);\n}\n');
+  w(`${pl}/TodoApi.Tests/TodoApi.Tests.csproj`, '<Project Sdk="Microsoft.NET.Sdk">\n\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <ImplicitUsings>enable</ImplicitUsings>\n    <Nullable>enable</Nullable>\n    <IsPackable>false</IsPackable>\n  </PropertyGroup>\n\n  <ItemGroup>\n    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />\n    <PackageReference Include="xunit" Version="2.9.3" />\n    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />\n  </ItemGroup>\n\n  <ItemGroup>\n    <ProjectReference Include="..\\TodoApi\\TodoApi.csproj" />\n  </ItemGroup>\n\n  <ItemGroup>\n    <Using Include="Xunit" />\n  </ItemGroup>\n\n</Project>\n');
+  w(`${pl}/TodoApi.Tests/PriceCalculatorTests.cs`, 'using TodoApi;\n\nnamespace TodoApi.Tests;\n\npublic class PriceCalculatorTests\n{\n    [Fact]\n    public void Adds_15_percent_VAT()\n    {\n        Assert.Equal(115.00m, PriceCalculator.WithVat(100m));\n    }\n\n    [Theory]\n    [InlineData(0)]\n    [InlineData(10)]\n    [InlineData(99.99)]\n    public void Never_returns_less_than_the_price(decimal price)\n    {\n        Assert.True(PriceCalculator.WithVat(price) >= price);\n    }\n}\n');
+  w(`${pl}/Dockerfile`, '# ---- build stage: full SDK to compile\nFROM mcr.microsoft.com/dotnet/sdk:10.0 AS build\nWORKDIR /src\nCOPY . .\nRUN dotnet publish TodoApi/TodoApi.csproj -c Release -o /app\n\n# ---- runtime stage: small ASP.NET image, no compilers\nFROM mcr.microsoft.com/dotnet/aspnet:10.0\nWORKDIR /app\nCOPY --from=build /app .\nUSER app\nEXPOSE 8080\nENTRYPOINT ["dotnet", "TodoApi.dll"]\n');
+  w(`${pl}/.github/workflows/ci.yml`, '# CI for the Todo API: runs on every push and pull request\nname: CI\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Check out the code\n        uses: actions/checkout@v4\n\n      - name: Install .NET 10\n        uses: actions/setup-dotnet@v4\n        with:\n          dotnet-version: 10.0.x\n\n      - name: Build\n        run: dotnet build\n\n      # TODO (your mission): add a step named "Test" that runs: dotnet test\n\n  docker:\n    needs: build\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Build image\n        run: docker build -t ghcr.io/phemelo/todo-api:1.2 .\n');
+  w(`${pl}/.gitignore`, 'bin/\nobj/\n*.db\n');
+
+  // --- Helm lab: a chart for the API
+  const hc = 'labs/helm/charts/todo-api';
+  w(`${hc}/Chart.yaml`, 'apiVersion: v2\nname: todo-api\ndescription: Kasi Market Todo API (ASP.NET Core) for Kubernetes\ntype: application\nversion: 0.1.0\nappVersion: "1.0"\n');
+  w(`${hc}/values.yaml`, '# Change these with --set key=value or your own values file (-f)\nreplicaCount: 2\n\nimage:\n  repository: ghcr.io/phemelo/todo-api\n  tag: ""          # empty = use the chart appVersion (1.0)\n\nservice:\n  type: NodePort\n  port: 8080\n');
+  w(`${hc}/templates/deployment.yaml`, 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ include "todo-api.fullname" . }}\nspec:\n  replicas: {{ .Values.replicaCount }}\n  selector:\n    matchLabels:\n      app: {{ include "todo-api.fullname" . }}\n  template:\n    metadata:\n      labels:\n        app: {{ include "todo-api.fullname" . }}\n    spec:\n      containers:\n        - name: api\n          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"\n          ports:\n            - containerPort: 8080\n          readinessProbe:\n            httpGet: { path: /healthz, port: 8080 }\n');
+  w(`${hc}/templates/service.yaml`, 'apiVersion: v1\nkind: Service\nmetadata:\n  name: {{ include "todo-api.fullname" . }}\nspec:\n  type: {{ .Values.service.type }}\n  ports:\n    - port: {{ .Values.service.port }}\n  selector:\n    app: {{ include "todo-api.fullname" . }}\n');
+  w(`${hc}/templates/_helpers.tpl`, '{{- define "todo-api.fullname" -}}\n{{- if contains .Chart.Name .Release.Name }}{{ .Release.Name }}{{- else }}{{ printf "%s-%s" .Release.Name .Chart.Name }}{{- end }}\n{{- end }}\n');
 }
 
 function seedHpc(sh: ShellSession) {

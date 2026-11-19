@@ -10,13 +10,18 @@ import { Terminal } from '../ui/Terminal';
 import { Editor } from '../ui/Editor';
 import { sfx } from '../sfx';
 
-type Profile = 'linux' | 'cloud' | 'hpc' | 'vm';
+type Profile = 'linux' | 'cloud' | 'hpc' | 'vm' | 'dev';
+
+const ICON: Record<Profile, string> = { linux: '🐧', vm: '🐧', cloud: '☁️', hpc: '🧮', dev: '📱' };
+const COLOR: Record<Profile, string> = { linux: '#eab308', vm: '#eab308', cloud: '#06b6d4', hpc: '#a855f7', dev: '#8b5cf6' };
+const TAB: Record<Profile, string> = { linux: '🐧 Linux/VM', vm: '🖥 VMs', cloud: '☁️ Cloud', hpc: '🧮 HPC', dev: '📱 Dev Studio' };
 
 const FREE: Record<Profile, Lab> = {
   linux: { id: 'free-linux', kind: 'linux', title: 'Free Ubuntu Server terminal', brief: 'Your own Ubuntu 24.04 server to explore. Nothing is graded - break it, fix it, learn.', minutes: 0, machine: { hostname: 'ubuntu-srv' }, objectives: [], hints: [] },
   vm: { id: 'vm-manager', kind: 'vm', title: 'VM Manager (VirtualBox-style)', brief: 'Create virtual machines, choose their network mode, start them and take snapshots.', minutes: 0, machine: {}, objectives: [], hints: [] },
   cloud: { id: 'free-cloud', kind: 'cloud', title: 'Free CloudShell', brief: 'Docker, kubectl, aws, terraform and ansible - all simulated and safe.', minutes: 0, machine: { profile: 'cloud', hostname: 'cloudshell' }, objectives: [], hints: [] },
   hpc: { id: 'free-hpc', kind: 'hpc', title: 'Free HPC login node', brief: 'A supercomputer login node with Slurm, modules and MPI.', minutes: 0, machine: { profile: 'hpc', hostname: 'login01' }, objectives: [], hints: [] },
+  dev: { id: 'free-dev', kind: 'dev', title: 'Free Dev Studio terminal', brief: '.NET 10, Flutter, Docker, kubectl, Helm and act (GitHub Actions) - build, test and ship anything. Nothing is graded.', minutes: 0, machine: { profile: 'dev', hostname: 'devbox' }, objectives: [], hints: [] },
 };
 
 export default function ShellLab({ initial, profile = 'linux' }: { initial?: string; profile?: Profile }) {
@@ -24,12 +29,12 @@ export default function ShellLab({ initial, profile = 'linux' }: { initial?: str
   const [prof, setProf] = useState<Profile>(profile);
   const progress = useGame((s) => s.progress);
   const done = new Set((progress?.labs ?? []).filter((l) => l.completed_at).map((l) => l.lab_id));
-  const kinds: Record<Profile, Lab['kind'][]> = { linux: ['linux', 'vm'], vm: ['vm', 'linux'], cloud: ['cloud'], hpc: ['hpc'] };
+  const kinds: Record<Profile, Lab['kind'][]> = { linux: ['linux', 'vm'], vm: ['vm', 'linux'], cloud: ['cloud'], hpc: ['hpc'], dev: ['dev'] };
   const list = [...SHELL_LABS.filter((l) => kinds[prof].includes(l.kind)), FREE[prof], ...(prof === 'linux' ? [FREE.vm] : [])];
   const lab = [...SHELL_LABS, ...Object.values(FREE)].find((l) => l.id === labId);
-  const titles: Record<Profile, string> = { linux: 'Server Room - Linux & VMs', vm: 'Server Room - Virtual Machines', cloud: 'Cloud Tower - CloudShell', hpc: 'Supercomputer - HPC Cluster' };
+  const titles: Record<Profile, string> = { linux: 'Server Room - Linux & VMs', vm: 'Server Room - Virtual Machines', cloud: 'Cloud Tower - CloudShell', hpc: 'Supercomputer - HPC Cluster', dev: 'App Studio - Flutter, ASP.NET, DevOps & Kubernetes' };
   return (
-    <Panel title={lab ? lab.title : titles[prof]} icon={prof === 'cloud' ? '☁️' : prof === 'hpc' ? '🧮' : '🐧'} color={prof === 'cloud' ? '#06b6d4' : prof === 'hpc' ? '#a855f7' : '#eab308'} flush={!!lab} actions={lab ? <button className="btn small" onClick={() => setLabId(undefined)}>← All labs</button> : <div className="tabs">{(['linux', 'cloud', 'hpc'] as Profile[]).map((p) => <button key={p} className={`tab ${prof === p ? 'active' : ''}`} onClick={() => setProf(p)}>{p === 'linux' ? '🐧 Linux/VM' : p === 'cloud' ? '☁️ Cloud' : '🧮 HPC'}</button>)}</div>}>
+    <Panel title={lab ? lab.title : titles[prof]} icon={ICON[prof]} color={COLOR[prof]} flush={!!lab} actions={lab ? <button className="btn small" onClick={() => setLabId(undefined)}>← All labs</button> : <div className="tabs">{(['linux', 'cloud', 'dev', 'hpc'] as Profile[]).map((p) => <button key={p} className={`tab ${prof === p ? 'active' : ''}`} onClick={() => setProf(p)}>{TAB[p]}</button>)}</div>}>
       {!lab ? (
         <div className="grid-auto">
           {list.map((l) => (
@@ -54,7 +59,7 @@ export default function ShellLab({ initial, profile = 'linux' }: { initial?: str
   );
 }
 
-function useShellLab(lab: Lab, completed: boolean, kind: 'linux' | 'cloud' | 'hpc' | 'vm', session: ShellSession | null) {
+function useShellLab(lab: Lab, completed: boolean, kind: 'linux' | 'cloud' | 'hpc' | 'vm' | 'dev', session: ShellSession | null) {
   const { reward } = useGame();
   const events = useRef<string[]>([]);
   const [version, setVersion] = useState(0);
@@ -129,7 +134,7 @@ function Objectives({ lab, results, doneNow }: { lab: Lab; results: boolean[]; d
 }
 
 function ShellRunner({ lab, completed }: { lab: Lab; completed: boolean }) {
-  const kind = lab.kind as 'linux' | 'cloud' | 'hpc';
+  const kind = lab.kind as 'linux' | 'cloud' | 'hpc' | 'dev';
   const [session, setSession] = useState<ShellSession | null>(null);
   const [side, setSide] = useState<'mission' | 'k8s' | 'aws' | 'hpc'>('mission');
   const { version, results, doneNow, edit, setEdit, onEvents, events } = useShellLab(lab, completed, kind, session);
@@ -162,7 +167,7 @@ function ShellRunner({ lab, completed }: { lab: Lab; completed: boolean }) {
   return (
     <div className="split" style={{ gridTemplateColumns: 'minmax(0, 1.4fr) minmax(380px, 1fr)' }}>
       <div style={{ minHeight: 0, overflow: 'hidden' }}>
-        <Terminal session={session} onEvents={(ev) => onEvents(ev, save)} accent={kind === 'cloud' ? '#22d3ee' : kind === 'hpc' ? '#c084fc' : '#facc15'} />
+        <Terminal session={session} onEvents={(ev) => onEvents(ev, save)} accent={kind === 'cloud' ? '#22d3ee' : kind === 'hpc' ? '#c084fc' : kind === 'dev' ? '#a78bfa' : '#facc15'} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid var(--line)', minHeight: 0 }}>
         <div className="row" style={{ padding: 8, borderBottom: '1px solid var(--line)' }}>
@@ -170,12 +175,8 @@ function ShellRunner({ lab, completed }: { lab: Lab; completed: boolean }) {
             <button className={`tab ${side === 'mission' ? 'active' : ''}`} onClick={() => setSide('mission')}>
               🎯 Mission {lab.objectives.length ? `${results.filter(Boolean).length}/${lab.objectives.length}` : ''}
             </button>
-            {kind === 'cloud' && (
-              <>
-                <button className={`tab ${side === 'k8s' ? 'active' : ''}`} onClick={() => setSide('k8s')}>☸ Cluster 3D</button>
-                <button className={`tab ${side === 'aws' ? 'active' : ''}`} onClick={() => setSide('aws')}>🟧 AWS</button>
-              </>
-            )}
+            {(kind === 'cloud' || kind === 'dev') && <button className={`tab ${side === 'k8s' ? 'active' : ''}`} onClick={() => setSide('k8s')}>☸ Cluster 3D</button>}
+            {kind === 'cloud' && <button className={`tab ${side === 'aws' ? 'active' : ''}`} onClick={() => setSide('aws')}>🟧 AWS</button>}
             {kind === 'hpc' && <button className={`tab ${side === 'hpc' ? 'active' : ''}`} onClick={() => setSide('hpc')}>🧮 Queue</button>}
           </div>
           <span className="grow" />

@@ -19,6 +19,9 @@ export const KNOWN_IMAGES: Record<string, { sizeMb: number; port?: number; log: 
   'prom/prometheus': { sizeMb: 290, port: 9090, log: ['Server is ready to receive web requests.'] },
   traefik: { sizeMb: 180, port: 80, log: ['Configuration loaded from flags.'] },
   'routerunner/web': { sizeMb: 145, port: 8080, log: ['Route Runner web listening on :8080'] },
+  'mcr.microsoft.com/dotnet/sdk': { sizeMb: 880, log: [] },
+  'mcr.microsoft.com/dotnet/aspnet': { sizeMb: 225, port: 8080, log: ['info: Microsoft.Hosting.Lifetime[14] Now listening on: http://[::]:8080'] },
+  'ghcr.io/cirruslabs/flutter': { sizeMb: 1900, log: [] },
 };
 
 export function imageKnown(ref: string): boolean {
@@ -214,6 +217,10 @@ export const docker: Handler = (ctx, args) => {
     case 'login':
       return ok('Login Succeeded\n');
     case 'push':
+      if (d.images.some((i) => `${i.repo}:${i.tag}`.startsWith(pos[0] ?? '#')) && ctx.s.k8s) {
+        const ref = (pos[0] ?? '').includes(':') ? pos[0] : `${pos[0]}:latest`;
+        ctx.s.k8s.registry = [...new Set([...(ctx.s.k8s.registry ?? []), ref])];
+      }
       return d.images.some((i) => `${i.repo}:${i.tag}`.startsWith(pos[0] ?? '#')) ? ok(`The push refers to repository [docker.io/${pos[0]}]\nlatest: digest: sha256:${shortId(5, 64)} size: 1570\n`) : fail(`An image does not exist locally with the tag: ${pos[0]}`);
     case 'system':
       return ok('TYPE            TOTAL     ACTIVE    SIZE\nImages          ' + d.images.length + '         ' + d.images.length + '         ' + d.images.reduce((a, i) => a + i.sizeMb, 0).toFixed(0) + 'MB\n');
