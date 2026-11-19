@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.github
+coverage
+*.log
+*.db
+deploy
+docs
+.vscode

@@ -1,0 +1,9 @@
+{
+  "name": "@route-runner/content",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "description": "Curriculum as typed code: streams, chapters, lessons, quizzes, flashcards, labs and the CCNA question bank."
+}

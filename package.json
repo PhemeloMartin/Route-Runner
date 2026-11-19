@@ -1,0 +1,40 @@
+{
+  "name": "route-runner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Route Runner - a 3D gamified academy that trains Phemelo to become a Network Engineer (CCNA), Cloud Engineer and Forex Trader. Works fully offline.",
+  "license": "MIT",
+  "author": "Phemelo Martin Mashome",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "bin": {
+    "route-runner": "bin/route-runner.mjs"
+  },
+  "engines": {
+    "node": ">=20.10"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build -w @route-runner/client && npm run build -w @route-runner/server",
+    "start": "node bin/route-runner.mjs play",
+    "play": "node bin/route-runner.mjs play",
+    "status": "node bin/route-runner.mjs status",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p packages/engine --noEmit && tsc -p packages/content --noEmit && tsc -p apps/server --noEmit && tsc -p apps/client --noEmit",
+    "market:seed": "node scripts/fetch-market-seed.mjs",
+    "content:check": "tsx scripts/content-stats.ts",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "esbuild": "^0.24.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "~5.9.3",
+    "vitest": "^2.1.9"
+  }
+}

@@ -1,0 +1,22 @@
+# Run Route Runner in a container:  docker compose up -d   ->  http://localhost:7420
+services:
+  route-runner:
+    build: .
+    image: ghcr.io/phemelomartin/route-runner:latest
+    container_name: route-runner
+    ports:
+      - "7420:7420"
+    environment:
+      LOG_LEVEL: info
+      MARKET_REFRESH: "on"
+    volumes:
+      - route-runner-data:/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  route-runner-data:

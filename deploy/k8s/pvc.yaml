@@ -1,0 +1,10 @@
+# The save-game database is a single SQLite file, so it lives on one ReadWriteOnce volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: route-runner-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi

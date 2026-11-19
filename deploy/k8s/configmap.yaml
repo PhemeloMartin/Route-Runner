@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: route-runner-config
+data:
+  LOG_LEVEL: info
+  MARKET_REFRESH: "on"
+  HOST: 0.0.0.0
+  PORT: "7420"
+  ROUTE_RUNNER_DATA: /data

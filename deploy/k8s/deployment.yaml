@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: route-runner
+  labels:
+    app.kubernetes.io/name: route-runner
+spec:
+  # SQLite is single-writer: exactly one replica, and Recreate (not RollingUpdate) so two pods
+  # never mount the same database file at once. Scale-out would mean moving to PostgreSQL.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: route-runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: route-runner
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7420"
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: route-runner
+          image: ghcr.io/phemelomartin/route-runner:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7420
+          envFrom:
+            - configMapRef:
+                name: route-runner-config
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: route-runner-data
+        - name: tmp
+          emptyDir: {}

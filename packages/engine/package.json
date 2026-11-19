@@ -1,0 +1,9 @@
+{
+  "name": "@route-runner/engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "description": "Pure TypeScript simulation engines: Cisco IOS CLI, packet-level network model, Linux shell, Docker/Kubernetes/cloud CLIs, forex maths, spaced repetition and XP."
+}
